@@ -32,6 +32,26 @@ _TG_RANGES = [
      struct.unpack('!I', _socket.inet_aton('91.108.255.255'))[0]),
 ]
 
+_IP_TO_DC: Dict[str, int] = {
+    # DC1
+    '149.154.175.50': 1, '149.154.175.51': 1, '149.154.175.54': 1,
+    # DC2
+    '149.154.167.41': 2,
+    '149.154.167.50': 2, '149.154.167.51': 2, '149.154.167.220': 2,
+    # DC3
+    '149.154.175.100': 3, '149.154.175.101': 3,
+    # DC4
+    '149.154.167.91': 4, '149.154.167.92': 4,
+    # DC5
+    '91.108.56.100': 5, 
+    '91.108.56.126': 5, '91.108.56.101': 5, '91.108.56.116': 5, 
+    # DC203
+    '91.105.192.100': 203,
+    # Media DCs
+    '149.154.167.151': 2, '149.154.167.223': 2, 
+    '149.154.166.120': 4, '149.154.166.121': 4,
+}
+
 _dc_opt: Dict[int, Optional[str]] = {}
 
 # DCs where WS is known to fail (302 redirect)
@@ -578,7 +598,7 @@ async def _handle_client(reader, writer):
                 rr, rw = await asyncio.wait_for(
                     asyncio.open_connection(dst, port), timeout=10)
             except Exception as exc:
-                log.warning("[%s] passthrough failed: %s", label, exc)
+                log.warning("[%s] passthrough failed to %s: %s", label, dst, exc)
                 writer.write(_socks5_reply(0x05))
                 await writer.drain()
                 writer.close()
@@ -621,6 +641,9 @@ async def _handle_client(reader, writer):
 
         # -- Extract DC ID --
         dc, is_media = _dc_from_init(init)
+        if dc is None and dst in _IP_TO_DC:
+            dc = _IP_TO_DC.get(dst)
+
         if dc is None or dc not in _dc_opt:
             log.warning("[%s] unknown DC%s for %s:%d -> TCP passthrough",
                         label, dc, dst, port)
